@@ -188,8 +188,10 @@ function App() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, language, rules: data.rules, memories: data.memories, memoryEnabled: settings.useMemory, blockCritical: settings.blockCritical }),
       }).then(async response => {
-        const payload = await response.json()
-        if (response.status === 429) {
+        const payload = await response.json().catch(() => ({}))
+        const quotaCode = typeof payload.code === 'string' && payload.code === 'gemini_rate_limited'
+        const quotaMessage = typeof payload.error === 'string' && /quota|rate[\s_-]*limit|resource[\s_-]*exhausted/i.test(payload.error)
+        if (response.status === 429 || quotaCode || quotaMessage) {
           usedLocalFallback = true
           return localResult
         }
