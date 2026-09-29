@@ -43,6 +43,86 @@ function pythonFunctions(lines: string[]) {
   return functions
 }
 
+function pythonSyntaxFindings(lines: string[]) {
+  const findings: { line: number; snippet: string; why: string; fix: string }[] = []
+  const delimiters: { character: string; line: number }[] = []
+  const matchingOpen: Record<string, string> = { ')': '(', ']': '[', '}': '{' }
+  let quote = ''
+  let tripleQuote = false
+
+  lines.forEach((line, lineIndex) => {
+    const insideMultilineString = tripleQuote
+    const isHeader = !insideMultilineString && delimiters.length === 0 &&
+      /^\s*(?:(?:async\s+)?(?:def|for|with)|if|elif|else|while|try|except|finally|class|match|case)\b/.test(line)
+    let hasHeaderColon = false
+
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index]
+      if (quote) {
+        if (tripleQuote) {
+          if (line.slice(index, index + 3) === quote.repeat(3)) {
+            quote = ''
+            tripleQuote = false
+            index += 2
+          }
+        } else if (character === '\\') {
+          index += 1
+        } else if (character === quote) {
+          quote = ''
+        }
+        continue
+      }
+
+      if (character === '#') break
+      if (character === '"' || character === "'") {
+        quote = character
+        tripleQuote = line.slice(index, index + 3) === character.repeat(3)
+        if (tripleQuote) index += 2
+        continue
+      }
+
+      if (character === '(' || character === '[' || character === '{') {
+        delimiters.push({ character, line: lineIndex })
+      } else if (character in matchingOpen) {
+        const expected = matchingOpen[character]
+        if (delimiters[delimiters.length - 1]?.character === expected) {
+          delimiters.pop()
+        } else {
+          findings.push({
+            line: lineIndex,
+            snippet: line,
+            why: `The closing '${character}' has no matching '${expected}'.`,
+            fix: `Remove the extra '${character}' or add its matching '${expected}'.`,
+          })
+        }
+      } else if (character === ':' && isHeader && delimiters.length === 0) {
+        hasHeaderColon = true
+      }
+    }
+
+    if (isHeader && !hasHeaderColon && delimiters.length === 0) {
+      findings.push({
+        line: lineIndex,
+        snippet: line,
+        why: 'Python compound statements must end with a colon before their body.',
+        fix: "Add ':' after the statement header.",
+      })
+    }
+  })
+
+  for (const delimiter of delimiters) {
+    const closing = delimiter.character === '(' ? ')' : delimiter.character === '[' ? ']' : '}'
+    findings.push({
+      line: delimiter.line,
+      snippet: lines[delimiter.line],
+      why: `This '${delimiter.character}' is not closed.`,
+      fix: `Add the missing '${closing}'.`,
+    })
+  }
+
+  return findings
+}
+
 function createPythonSqlFix(lines: string[], injectionLine: number) {
   const sqlAssignment = lines[injectionLine].match(/^(\s*)(\w+)\s*=\s*(["'])(.+?)(?:\s*)\+\s*(\w+)\s*$/)
   if (!sqlAssignment) return undefined
@@ -137,6 +217,11 @@ export function analyzeCode({ code, language, rules, memories, memoryEnabled }: 
       ...(memoryIds.length === 1 ? { memoryId: memoryIds[0] } : {}),
       ...(memoryIds.length ? { memoryIds } : {}),
     })
+  }
+  if (language === 'Python') {
+    for (const finding of pythonSyntaxFindings(lines)) {
+      addIssue('CRITICAL', 'Python syntax error', finding.line, finding.snippet, finding.why, finding.fix)
+    }
   }
   let mutableDefaultLine = -1
 

@@ -11,6 +11,26 @@ function findIssue(code: string, title: string) {
 }
 
 describe('CodeMind sample review cases', () => {
+  it('detects missing Python colons and unmatched parentheses', () => {
+    const samples = [
+      'print("Total:", total',
+      'def login(username, password)',
+      'else',
+      'if name in users',
+      'for i in range(5)',
+      'print(greet("Developer")',
+    ]
+
+    for (const code of samples) {
+      expect(review(code).issues.some(issue => issue.title === 'Python syntax error')).toBe(true)
+    }
+  })
+
+  it('ignores delimiter characters inside Python strings and comments', () => {
+    const code = 'message = "an unmatched ( and colon:" # comment ]'
+    expect(review(code).issues.filter(issue => issue.title === 'Python syntax error')).toHaveLength(0)
+  })
+
   it('01 detects SQL injection and links PR #18', () => {
     const result = review('def get_user(user_id):\n    query = "SELECT * FROM users WHERE id=" + user_id\n    return database.execute(query)')
     const issue = result.issues.find(item => item.title === 'SQL Injection Risk')

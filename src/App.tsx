@@ -221,15 +221,21 @@ function App() {
       const [analysis] = await Promise.all([analysisRequest, new Promise(resolve => { reviewTimer.current = setTimeout(resolve, 3300) })])
       if (stageTimer.current) clearInterval(stageTimer.current)
       const nextId = Math.max(...data.reviews.map(item => item.id), 42) + 1
-      const issues = analysis.issues
-      const critical = analysis.criticalCount
+      const issues = [...analysis.issues]
+      const syntaxIssues = localAnalysis.issues.filter(issue => issue.title === 'Python syntax error')
+      for (const issue of syntaxIssues) {
+        if (!issues.some(existing => existing.title === issue.title && existing.line === issue.line)) issues.push(issue)
+      }
+      const critical = issues.filter(issue => issue.severity === 'CRITICAL').length
       const matchedIds = [...new Set(issues.flatMap(issue => [...(issue.memoryIds ?? []), ...(issue.memoryId === undefined ? [] : [issue.memoryId])]))]
       const matchedMemory = data.memories.find(item => matchedIds.includes(item.id))
       const result: ReviewRecord = {
         id: nextId, repository: 'Submitted code', language, issueCount: issues.length,
-        status: analysis.status,
+        status: critical && settings.blockCritical ? 'Needs Changes' : issues.length ? 'Approved with Suggestions' : 'Approved',
         date: 'Today', critical,
-        summary: analysis.summary,
+        summary: issues.length > analysis.issues.length
+          ? `${analysis.summary} Local checks also found Python syntax errors that should be corrected.`
+          : analysis.summary,
         issues,
         originalCode: code,
         fixedCode: [analysis.fixedCode, localAnalysis.fixedCode].find((candidate): candidate is string =>
