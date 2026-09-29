@@ -76,6 +76,49 @@ function createMutableDefaultFix(lines: string[], definitionLine: number) {
   return updated.join('\n')
 }
 
+export function generateFixedCode(code: string, language: string, issues: ReviewIssue[]) {
+  if (language !== 'Python') return undefined
+
+  let lines = code.split('\n')
+  const sqlLine = lines.findIndex((line, index) => issues.some(issue => issue.title === 'SQL Injection Risk' && issue.line === index + 1) && /\b(select|insert|update|delete)\b/i.test(line))
+  if (sqlLine >= 0) {
+    const fixedSql = createPythonSqlFix(lines, sqlLine)
+    if (fixedSql) lines = fixedSql.split('\n')
+  }
+
+  const mutableDefaultLine = lines.findIndex(line => /^\s*def\s+\w+\s*\([^)]*\b\w+\s*=\s*(?:\[\]|\{\})/.test(line))
+  if (mutableDefaultLine >= 0) {
+    const fixedDefaults = createMutableDefaultFix(lines, mutableDefaultLine)
+    if (fixedDefaults) lines = fixedDefaults.split('\n')
+  }
+
+  const secretLine = lines.findIndex(line => /^\s*[A-Z_][A-Z0-9_]*\s*=\s*["'][^"']+["']\s*$/.test(line))
+  if (secretLine >= 0 && issues.some(issue => issue.title === 'Hard-coded secret')) {
+    const assignment = lines[secretLine].match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*["']([^"']+)["']\s*$/)
+    if (assignment) {
+      const [, name] = assignment
+      const envName = name.replace(/[^A-Z0-9_]/g, '_').toUpperCase()
+      lines.splice(secretLine, 1, `${' '.repeat(lines[secretLine].match(/^\s*/)?.[0].length ?? 0)}${name} = os.environ.get("${envName}", "")`)
+      if (!lines.some(line => /^\s*import\s+os\b/.test(line))) lines.unshift('import os')
+    }
+  }
+
+  const unusedVariableNames = issues.filter(issue => issue.title === 'Unused variable').map(issue => {
+    const match = issue.snippet.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/)
+    return match ? match[1] : null
+  }).filter((value): value is string => Boolean(value))
+
+  if (unusedVariableNames.length) {
+    const filtered = lines.filter(line => {
+      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/)
+      return !match || !unusedVariableNames.includes(match[1])
+    })
+    if (filtered.length) lines = filtered
+  }
+
+  return lines.join('\n')
+}
+
 export function analyzeCode({ code, language, rules, memories, memoryEnabled }: AnalyzeInput): ReviewAnalysis {
   const lines = code.split('\n')
   const file = sourceFile(language)
@@ -94,7 +137,6 @@ export function analyzeCode({ code, language, rules, memories, memoryEnabled }: 
       ...(memoryIds.length ? { memoryIds } : {}),
     })
   }
-  let sqlInjectionLine = -1
   let mutableDefaultLine = -1
 
   lines.forEach((line, index) => {
@@ -102,7 +144,6 @@ export function analyzeCode({ code, language, rules, memories, memoryEnabled }: 
       const interpolatedSql = sqlStatement && (/["'][^"']*["']\s*\+\s*\w+/.test(line) || /\b\w+\s*\+\s*\w+/.test(line) || /\$\{|\.format\s*\(/.test(line) || /\bf["'][^"']*\{\w+\}/i.test(line))
 
     if (interpolatedSql) {
-      sqlInjectionLine = index
       addIssue('CRITICAL', 'SQL Injection Risk', index, line,
         'SQL text is combined with a value in source code. If that value is user-controlled, it can alter the query and expose or modify data.',
         'Use a parameterized query and bind values separately from the SQL statement.', [parameterizedMemory])
@@ -210,11 +251,7 @@ export function analyzeCode({ code, language, rules, memories, memoryEnabled }: 
   const summary = hasMemoryMatch
     ? 'Relevant team decisions matched these findings. Each Memory Match below shows the rule or previous review that applies.'
     : `${issues.length} finding${issues.length === 1 ? '' : 's'} identified by local security and team-rule checks. No relevant previous team decision found.`
-  const fixedCode = language === 'Python' && sqlInjectionLine >= 0
-    ? createPythonSqlFix(lines, sqlInjectionLine)
-    : language === 'Python' && mutableDefaultLine >= 0
-      ? createMutableDefaultFix(lines, mutableDefaultLine)
-      : undefined
+  const fixedCode = language === 'Python' ? generateFixedCode(code, language, issues) : undefined
 
   return { issues, summary, fixedCode }
 }

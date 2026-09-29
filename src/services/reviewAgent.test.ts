@@ -97,4 +97,16 @@ describe('CodeMind sample review cases', () => {
     expect(passwordIssue?.severity).toBe('CRITICAL')
     expect(passwordIssue?.memoryId).toBe(4)
   })
+
+  it('13 produces one combined fix for multiple Python issues', () => {
+    const code = `def get_user(user_id, items=[]):
+    query = "SELECT * FROM users WHERE id=" + user_id
+    items.append(user_id)
+    return database.execute(query), items`
+    const result = review(code)
+    expect(result.fixedCode).toContain('items=None')
+    expect(result.fixedCode).toContain('if items is None:')
+    expect(result.fixedCode).toContain('%s')
+    expect(result.fixedCode).toContain('database.execute(query, (user_id,))')
+  })
 })
