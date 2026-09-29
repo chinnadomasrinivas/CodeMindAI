@@ -214,6 +214,7 @@ function App() {
         date: 'Today', critical,
         summary: analysis.summary,
         issues,
+        originalCode: code,
         fixedCode: analysis.fixedCode || localAnalysis.fixedCode || undefined,
         provider: analysis.provider,
         lesson: analysis.lesson ?? {
@@ -321,20 +322,14 @@ function ReviewWorkspace({ code, setCode, language, setLanguage, data, reviewSta
   const liveAnalysis = analyzeCode({ code, language, rules: data.rules, memories: data.memories, memoryEnabled })
   return <div className="page review-page"><PageHeading eyebrow="CODE REVIEW AGENT" title="Submit code for review" subtitle="Give your code a review grounded in how your team works." action={<div className={`agent-status ${groqConfigured ? '' : 'agent-local'}`}><span className="health-dot" />{groqConfigured ? `Groq key loaded · ${model}` : 'Local checks only'}</div>} />
     <div className="review-workspace"><div className="editor-column"><div className="editor-caption"><div><span className="editor-caption-icon"><Terminal size={15} /></span><span><strong>Review your changes</strong><small>Paste a snippet or edit the sample below</small></span></div><button className="button-quiet small-quiet" onClick={onClear}><RotateCw size={14} />Clear</button></div><CodeEditor code={code} setCode={setCode} language={language} setLanguage={setLanguage} onReview={onRun} onPaste={onPaste} onCopy={onCopy} /><LiveFindings issues={liveAnalysis.issues} hasCode={Boolean(code.trim())} />
-    {fixPreview && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 18 }}>
-      <div style={{ border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: 12, background: 'rgba(15, 23, 42, 0.7)', padding: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, color: '#cbd5e1', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.08 }}>
-          <span>Current code</span>
-          <button className="button-quiet small-quiet" onClick={onClosePreview} style={{ padding: '6px 10px' }}>Close</button>
-        </div>
-        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: 12, lineHeight: 1.5, color: '#e2e8f0', background: 'transparent' }}>{fixPreview.original}</pre>
+    {fixPreview && <div className="fix-preview-panel">
+      <div className="compare-pane original-pane">
+        <div className="compare-pane-header"><span>Current code</span><button className="button-quiet small-quiet" onClick={onClosePreview}>Close</button></div>
+        <pre className="compare-code-block">{fixPreview.original}</pre>
       </div>
-      <div style={{ border: '1px solid rgba(96, 165, 250, 0.35)', borderRadius: 12, background: 'rgba(13, 29, 47, 0.85)', padding: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, color: '#bfdbfe', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.08 }}>
-          <span>Suggested fix</span>
-          <button className="button-primary" onClick={() => setCode(fixPreview.fixed)} style={{ padding: '6px 10px', fontSize: 12 }}>Use fix</button>
-        </div>
-        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: 12, lineHeight: 1.5, color: '#dbeafe', background: 'transparent' }}>{fixPreview.fixed}</pre>
+      <div className="compare-pane fixed-pane">
+        <div className="compare-pane-header"><span>Suggested fix</span><button className="button-primary" onClick={() => setCode(fixPreview.fixed)}>Use fix</button></div>
+        <pre className="compare-code-block">{fixPreview.fixed}</pre>
       </div>
     </div>}
     <div className="review-submit-row"><div className="editor-hint"><span>⌘</span><span>Enter</span><span>to review</span></div><button className="button-primary" onClick={onRun}><Sparkles size={16} />{groqConfigured ? 'Review with Groq' : 'Review code'}<ArrowRight size={15} /></button></div><div className="privacy-note"><LockKeyhole size={13} />{groqConfigured ? `Submitting sends code and enabled team context to Google Groq (${model}).` : 'Groq is not configured; this review uses local checks only.'}</div></div>
@@ -349,6 +344,7 @@ function ReviewResults({ review, memories, onBack, onApply, onSave, onDismiss }:
   const matches = memories.filter(item => matchIds.includes(item.id))
   const passed = review.issues.length === 0
   return <div className="page results-page"><div className="results-back"><button className="back-link" onClick={onBack}><ArrowDownRight size={14} />Back to code review</button><span>Review <i>/</i> PR #{review.id}</span></div><div className="results-title-row"><div><div className="eyebrow">CODE REVIEW AGENT <span className="eyebrow-slash">/</span> COMPLETED JUST NOW</div><h1>Code Review Complete</h1><p>{review.repository} <span>·</span> {review.language} <span>·</span> {review.issueCount} findings</p></div><StatusBadge status={passed ? 'Approved' : review.status} /></div><section className={`result-summary ${passed ? 'summary-passed' : ''}`}><div className="summary-icon">{passed ? <ShieldCheck size={18} /> : <TriangleAlert size={18} />}</div><div><strong>{passed ? 'REVIEW PASSED' : review.status}</strong><p>{review.summary}</p></div><div className="summary-metrics"><span><b>{review.critical}</b> critical</span><i /><span><b>{review.issueCount}</b> total</span></div></section><AgentTrace />
+    {review.originalCode && review.fixedCode && <div className="fix-preview-panel result-panel"><div className="compare-pane original-pane"><div className="compare-pane-header"><span>Original code</span><span className="compare-pane-badge">Before</span></div><pre className="compare-code-block">{review.originalCode}</pre></div><div className="compare-pane fixed-pane"><div className="compare-pane-header"><span>Suggested fix</span><span className="compare-pane-badge">After</span></div><pre className="compare-code-block">{review.fixedCode}</pre></div></div>}
     {matches.length ? matches.map(item => <MemoryMatch item={item} key={item.id} />) : <div className="no-match-banner"><span><BrainCircuit size={17} /></span><div><strong>{passed ? 'No relevant memory required.' : 'No relevant previous team decision found.'}</strong><p>CodeMind only shows a Memory Match when a stored team rule or previous decision is relevant.</p></div></div>}
     <div className="findings-heading"><div><div className="eyebrow">REVIEW FINDINGS</div><h2>{passed ? 'No critical issues' : `${review.issues.length} recommendations`}</h2></div><div className="finding-legend"><span><i className="legend-critical" />Critical</span><span><i className="legend-warning" />Warning</span><span><i className="legend-suggestion" />Suggestion</span></div></div>
     {dismissedReviewId === review.id ? <div className="dismissed-findings"><span><Check size={14} /></span><div><strong>Findings dismissed for this review.</strong><small>You can restore them at any time.</small></div><button className="text-action" onClick={() => setDismissedReviewId(null)}>Restore findings</button></div> : <div className="issues-list">{review.issues.length ? review.issues.map((issue, index) => <ReviewIssue key={`${issue.title}-${index}`} issue={issue} index={index} />) : <div className="empty-findings"><ShieldCheck size={23} /><strong>No issues found</strong><span>This review has no recorded findings.</span></div>}</div>}

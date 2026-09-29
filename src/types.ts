@@ -39,6 +39,7 @@ export interface ReviewRecord {
   critical: number
   summary: string
   issues: ReviewIssue[]
+  originalCode?: string
   fixedCode?: string
   saved?: boolean
   provider?: 'Groq' | 'Local'
