@@ -30,7 +30,7 @@ export function Sidebar({ path, navigate, mobileOpen, closeMobile, geminiConfigu
         const active = target === '/review' ? path === target || path.startsWith('/review/') : path === target
         return <button key={target} className={`nav-link ${active ? 'nav-active' : ''}`} onClick={() => { navigate(target); closeMobile() }}><Icon size={17} strokeWidth={1.8} /><span>{label}</span>{label === 'Agent Memory' && <span className="nav-count">20</span>}</button>
       })}</nav>
-      <div className="sidebar-bottom"><div className="agent-health"><span className="health-dot" /><div><strong>{geminiConfigured ? 'Gemini connected' : 'Local review mode'}</strong><span>{geminiConfigured ? model : 'Add server key to enable AI'}</span></div></div><button className="profile-row"><div className="avatar">SR</div><span><strong>Sam Rivera</strong><small>Engineering lead</small></span><ChevronDown size={14} /></button></div>
+      <div className="sidebar-bottom"><div className="agent-health"><span className="health-dot" /><div><strong>{geminiConfigured ? 'Gemini key loaded' : 'Local review mode'}</strong><span>{geminiConfigured ? `${model} · access checked on review` : 'Add server key to enable AI'}</span></div></div><button className="profile-row"><div className="avatar">SR</div><span><strong>Sam Rivera</strong><small>Engineering lead</small></span><ChevronDown size={14} /></button></div>
     </aside>
   </>
 }

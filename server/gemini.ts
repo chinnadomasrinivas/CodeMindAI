@@ -31,6 +31,7 @@ export class GeminiReviewError extends Error {
 const memoryTypes = new Set<MemoryType>(['Team Rule', 'Previous Review', 'Architecture Decision', 'Common Mistake'])
 const validSeverities = new Set(['CRITICAL', 'WARNING', 'SUGGESTION'])
 let geminiClient: GoogleGenAI | undefined
+let geminiClientKey: string | undefined
 
 function getConfig() {
   return {
@@ -43,7 +44,10 @@ function getConfig() {
 function getGemini() {
   const { apiKey } = getConfig()
   if (!apiKey) throw new GeminiReviewError(503, 'gemini_not_configured', 'Gemini is not configured. Add GEMINI_API_KEY to the deployment environment.')
-  geminiClient ??= new GoogleGenAI({ apiKey })
+  if (!geminiClient || geminiClientKey !== apiKey) {
+    geminiClient = new GoogleGenAI({ apiKey })
+    geminiClientKey = apiKey
+  }
   return geminiClient
 }
 
