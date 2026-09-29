@@ -41,7 +41,7 @@ export interface ReviewRecord {
   issues: ReviewIssue[]
   fixedCode?: string
   saved?: boolean
-  provider?: 'Gemini' | 'Local'
+  provider?: 'Groq' | 'Local'
   lesson?: { type: MemoryType; title: string; description: string }
 }
 

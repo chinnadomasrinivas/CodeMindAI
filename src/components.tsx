@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+﻿import { useRef, useState } from 'react'
 import {
   Activity, Bell, BrainCircuit, Check, ChevronDown, ChevronRight, ClipboardPaste,
   Code2, Command, Copy, FileCode2, History, LayoutDashboard, Menu, Search, Settings2, ShieldCheck,
@@ -19,7 +19,7 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
   return <div className="brand-lockup"><div className="brand-mark"><Code2 size={17} strokeWidth={2.2} /><span><BrainCircuit size={11} /></span></div>{!compact && <div className="brand-name">CodeMind <b>AI</b></div>}</div>
 }
 
-export function Sidebar({ path, navigate, mobileOpen, closeMobile, geminiConfigured, model }: { path: string; navigate: (path: string) => void; mobileOpen: boolean; closeMobile: () => void; geminiConfigured: boolean; model: string }) {
+export function Sidebar({ path, navigate, mobileOpen, closeMobile, groqConfigured, model }: { path: string; navigate: (path: string) => void; mobileOpen: boolean; closeMobile: () => void; groqConfigured: boolean; model: string }) {
   return <>
     {mobileOpen && <button className="mobile-scrim" aria-label="Close navigation" onClick={closeMobile} />}
     <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
@@ -30,7 +30,7 @@ export function Sidebar({ path, navigate, mobileOpen, closeMobile, geminiConfigu
         const active = target === '/review' ? path === target || path.startsWith('/review/') : path === target
         return <button key={target} className={`nav-link ${active ? 'nav-active' : ''}`} onClick={() => { navigate(target); closeMobile() }}><Icon size={17} strokeWidth={1.8} /><span>{label}</span>{label === 'Agent Memory' && <span className="nav-count">20</span>}</button>
       })}</nav>
-      <div className="sidebar-bottom"><div className="agent-health"><span className="health-dot" /><div><strong>{geminiConfigured ? 'Gemini key loaded' : 'Local review mode'}</strong><span>{geminiConfigured ? `${model} · access checked on review` : 'Add server key to enable AI'}</span></div></div><button className="profile-row"><div className="avatar">SR</div><span><strong>Sam Rivera</strong><small>Engineering lead</small></span><ChevronDown size={14} /></button></div>
+      <div className="sidebar-bottom"><div className="agent-health"><span className="health-dot" /><div><strong>{groqConfigured ? 'Groq key loaded' : 'Local review mode'}</strong><span>{groqConfigured ? `${model} Â· access checked on review` : 'Add server key to enable AI'}</span></div></div><button className="profile-row"><div className="avatar">SR</div><span><strong>Sam Rivera</strong><small>Engineering lead</small></span><ChevronDown size={14} /></button></div>
     </aside>
   </>
 }
@@ -59,7 +59,7 @@ export function RuleCard({ rule, onToggle, onEdit, onDelete }: { rule: TeamRule;
 }
 
 export function ReviewTable({ reviews, onOpen }: { reviews: ReviewRecord[]; onOpen: (id: number) => void }) {
-  return <div className="table-scroll"><table className="review-table"><thead><tr><th>REVIEW</th><th>REPOSITORY</th><th>LANGUAGE</th><th>ISSUES</th><th>STATUS</th><th>DATE</th><th /></tr></thead><tbody>{reviews.map(review => <tr key={review.id} onClick={() => onOpen(review.id)}><td><span className="review-id">PR #{review.id}</span></td><td>{review.repository}</td><td><span className="language-cell"><span className="language-dot" />{review.language}</span></td><td>{review.issueCount} issues{review.critical > 0 && <span className="critical-inline"> · {review.critical} critical</span>}</td><td><StatusBadge status={review.status} /></td><td className="date-cell">{review.date}</td><td><ChevronRight size={15} className="table-chevron" /></td></tr>)}</tbody></table>{reviews.length === 0 && <div className="empty-state">No reviews match this search.</div>}</div>
+  return <div className="table-scroll"><table className="review-table"><thead><tr><th>REVIEW</th><th>REPOSITORY</th><th>LANGUAGE</th><th>ISSUES</th><th>STATUS</th><th>DATE</th><th /></tr></thead><tbody>{reviews.map(review => <tr key={review.id} onClick={() => onOpen(review.id)}><td><span className="review-id">PR #{review.id}</span></td><td>{review.repository}</td><td><span className="language-cell"><span className="language-dot" />{review.language}</span></td><td>{review.issueCount} issues{review.critical > 0 && <span className="critical-inline"> Â· {review.critical} critical</span>}</td><td><StatusBadge status={review.status} /></td><td className="date-cell">{review.date}</td><td><ChevronRight size={15} className="table-chevron" /></td></tr>)}</tbody></table>{reviews.length === 0 && <div className="empty-state">No reviews match this search.</div>}</div>
 }
 
 export function StatusBadge({ status }: { status: string }) {
@@ -96,7 +96,7 @@ export function ReviewIssue({ issue, index }: { issue: ReviewIssue; index: numbe
 
 export function MemoryMatch({ item }: { item: MemoryItem }) {
   const sourceType = item.type === 'Team Rule' ? 'RELEVANT TEAM RULE' : item.type === 'Architecture Decision' ? 'ARCHITECTURE DECISION' : 'PREVIOUS REVIEW'
-  return <section className="memory-match"><div className="match-topline"><span className="match-spark"><BrainCircuit size={17} /></span><div><div className="match-overline">MEMORY MATCH FOUND</div><h2>Your team has seen this before.</h2></div><span className="match-score">STRONG MATCH <i>96%</i></span></div><div className="match-body"><div className="match-source"><span className="mini-label">{sourceType}</span><strong>{item.source} <span className="match-separator">/</span> {item.title}</strong></div><div className="decision-quote"><span className="quote-mark">“</span><div><span className="mini-label">PREVIOUS TEAM DECISION</span><p>{item.description}</p></div></div><div className="match-footer"><span><Activity size={14} />Referenced in <strong>{item.usage} reviews</strong></span><span>Matched from Agent Memory</span></div></div></section>
+  return <section className="memory-match"><div className="match-topline"><span className="match-spark"><BrainCircuit size={17} /></span><div><div className="match-overline">MEMORY MATCH FOUND</div><h2>Your team has seen this before.</h2></div><span className="match-score">STRONG MATCH <i>96%</i></span></div><div className="match-body"><div className="match-source"><span className="mini-label">{sourceType}</span><strong>{item.source} <span className="match-separator">/</span> {item.title}</strong></div><div className="decision-quote"><span className="quote-mark">â€œ</span><div><span className="mini-label">PREVIOUS TEAM DECISION</span><p>{item.description}</p></div></div><div className="match-footer"><span><Activity size={14} />Referenced in <strong>{item.usage} reviews</strong></span><span>Matched from Agent Memory</span></div></div></section>
 }
 
 export function LoadingAnalysis({ stage, steps }: { stage: number; steps: string[] }) {

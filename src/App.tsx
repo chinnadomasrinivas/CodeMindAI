@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import {
   Activity, ArrowDownRight, ArrowRight, ArrowUpRight, BookOpenCheck, Braces,
   BrainCircuit, Check, ChevronDown, CircleHelp, Clock3, Code2, FileClock,
@@ -29,13 +29,13 @@ interface SettingsData {
   memoryNotifications: boolean
   reviewNotifications: boolean
 }
-interface GeminiHealth {
+interface GroqHealth {
   configured: boolean
   provider: string
   model: string
 }
-interface GeminiReviewResponse {
-  provider: 'Gemini' | 'Local'
+interface GroqReviewResponse {
+  provider: 'Groq' | 'Local'
   model: string
   status: string
   criticalCount: number
@@ -83,7 +83,7 @@ function App() {
     try { return { ...settingsDefaults, ...JSON.parse(localStorage.getItem('codemind-settings-v1') || '{}') } }
     catch { return settingsDefaults }
   })
-  const [geminiHealth, setGeminiHealth] = useState<GeminiHealth>({ configured: false, provider: 'Local checks', model: 'gemini-3.8-flash' })
+  const [groqHealth, setGroqHealth] = useState<GroqHealth>({ configured: false, provider: 'Local checks', model: 'openai/gpt-oss-120b' })
   const stageTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const reviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -92,13 +92,13 @@ function App() {
   useEffect(() => { localStorage.setItem('codemind-settings-v1', JSON.stringify(settings)) }, [settings])
   useEffect(() => {
     let active = true
-    const checkGemini = () => fetch('/api/health').then(response => response.json()).then(status => {
-      if (active) setGeminiHealth({ configured: status.configured === true, provider: status.provider ?? 'Local checks', model: status.model ?? 'gemini-3.8-flash' })
+    const checkGroq = () => fetch('/api/health').then(response => response.json()).then(status => {
+      if (active) setGroqHealth({ configured: status.configured === true, provider: status.provider ?? 'Local checks', model: status.model ?? 'openai/gpt-oss-120b' })
     }).catch(() => {
-      if (active) setGeminiHealth({ configured: false, provider: 'Local checks', model: 'gemini-3.8-flash' })
+      if (active) setGroqHealth({ configured: false, provider: 'Local checks', model: 'openai/gpt-oss-120b' })
     })
-    void checkGemini()
-    const healthTimer = setInterval(checkGemini, 5000)
+    void checkGroq()
+    const healthTimer = setInterval(checkGroq, 5000)
     return () => { active = false; clearInterval(healthTimer) }
   }, [])
   useEffect(() => {
@@ -164,39 +164,39 @@ function App() {
     stageTimer.current = setInterval(() => setReviewStage(stage => Math.min(stage + 1, activitySteps.length - 1)), 600)
     const localAnalysis = analyzeCode({ code, language, rules: data.rules, memories: data.memories, memoryEnabled: settings.useMemory })
     const localCritical = localAnalysis.issues.some(issue => issue.severity === 'CRITICAL')
-    const localResult: GeminiReviewResponse = {
+    const localResult: GroqReviewResponse = {
       provider: 'Local', model: 'local-pattern-checks',
       status: localCritical && settings.blockCritical ? 'Needs Changes' : localAnalysis.issues.length ? 'Approved with Suggestions' : 'Approved',
       criticalCount: localAnalysis.issues.filter(issue => issue.severity === 'CRITICAL').length,
       summary: localAnalysis.summary, issues: localAnalysis.issues, fixedCode: localAnalysis.fixedCode ?? '',
       lesson: { type: 'Previous Review', title: localAnalysis.issues[0]?.title ?? 'Review decision recorded', description: localAnalysis.issues[0]?.fix ?? localAnalysis.summary },
     }
-    let geminiConfigured = geminiHealth.configured
+    let groqConfigured = groqHealth.configured
     try {
       const healthResponse = await fetch('/api/health', { cache: 'no-store' })
       if (healthResponse.ok) {
-        const currentHealth = await healthResponse.json() as GeminiHealth
-        geminiConfigured = currentHealth.configured === true
-        setGeminiHealth(currentHealth)
+        const currentHealth = await healthResponse.json() as GroqHealth
+        groqConfigured = currentHealth.configured === true
+        setGroqHealth(currentHealth)
       }
     } catch {
-      geminiConfigured = false
+      groqConfigured = false
     }
     let usedLocalFallback = false
-    const analysisRequest = geminiConfigured
+    const analysisRequest = groqConfigured
       ? fetch('/api/review', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language, rules: data.rules, memories: data.memories, memoryEnabled: settings.useMemory, blockCritical: settings.blockCritical }),
+        body: JSON.stringify({ code, language, rules: data.rules, memories: data.memories, memoryEnabled: settings.useMemory, project: settings.repository, developer: settings.team, blockCritical: settings.blockCritical }),
       }).then(async response => {
         const payload = await response.json().catch(() => ({}))
-        const quotaCode = typeof payload.code === 'string' && payload.code === 'gemini_rate_limited'
+        const quotaCode = typeof payload.code === 'string' && payload.code === 'groq_rate_limited'
         const quotaMessage = typeof payload.error === 'string' && /quota|rate[\s_-]*limit|resource[\s_-]*exhausted/i.test(payload.error)
         if (response.status === 429 || quotaCode || quotaMessage) {
           usedLocalFallback = true
           return localResult
         }
-        if (!response.ok) throw new Error(payload.error ?? 'Gemini review failed. Check the server configuration.')
-        return payload as GeminiReviewResponse
+        if (!response.ok) throw new Error(payload.error ?? 'Groq review failed. Check the server configuration.')
+        return payload as GroqReviewResponse
       })
       : Promise.resolve(localResult)
     try {
@@ -228,11 +228,11 @@ function App() {
       }))
       setReviewStage(-1)
       navigate(`/review/${nextId}`)
-      if (usedLocalFallback) notify('Gemini quota reached. Review completed with local checks instead.')
+      if (usedLocalFallback) notify('Groq quota reached. Review completed with local checks instead.')
     } catch (error) {
       if (stageTimer.current) clearInterval(stageTimer.current)
       setReviewStage(-1)
-      notify(error instanceof Error ? error.message : 'Gemini review failed. Try again.')
+      notify(error instanceof Error ? error.message : 'Groq review failed. Try again.')
     }
   }
 
@@ -252,6 +252,16 @@ function App() {
       memories: [item, ...current.memories],
       reviews: current.reviews.map(entry => entry.id === review.id ? { ...entry, saved: true } : entry),
     }))
+    void fetch('/api/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: `Team feedback for ${settings.repository}: ${lesson.title}. ${lesson.description}`,
+        context: `Saved decision from review PR #${review.id}`,
+        language: review.language,
+        source: `PR #${review.id}`,
+      }),
+    }).catch(() => undefined)
     notify('Decision saved. CodeMind will use it in future reviews.')
   }
 
@@ -270,17 +280,17 @@ function App() {
   })
 
   return <div className="app-shell min-h-screen text-slate-100">
-    <Sidebar path={route.path} navigate={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} geminiConfigured={geminiHealth.configured} model={geminiHealth.model} />
+    <Sidebar path={route.path} navigate={navigate} mobileOpen={mobileOpen} closeMobile={() => setMobileOpen(false)} groqConfigured={groqHealth.configured} model={groqHealth.model} />
     <div className="main-column">
       <Header path={route.path} navigate={path => { if (search.trim()) setHistoryQuery(search); navigate(path) }} search={search} setSearch={setSearch} onMenu={() => setMobileOpen(true)} />
       <main className="main-content">
         {route.path === '/dashboard' && <Dashboard data={data} navigate={navigate} />}
-        {route.path === '/review' && <ReviewWorkspace code={code} setCode={setCode} language={language} setLanguage={setLanguage} data={data} reviewStage={reviewStage} onRun={createReview} onClear={() => setCode('')} onPaste={pasteFromClipboard} onCopy={() => copyToClipboard(code)} navigate={navigate} memoryEnabled={settings.useMemory} geminiConfigured={geminiHealth.configured} model={geminiHealth.model} />}
+        {route.path === '/review' && <ReviewWorkspace code={code} setCode={setCode} language={language} setLanguage={setLanguage} data={data} reviewStage={reviewStage} onRun={createReview} onClear={() => setCode('')} onPaste={pasteFromClipboard} onCopy={() => copyToClipboard(code)} navigate={navigate} memoryEnabled={settings.useMemory} groqConfigured={groqHealth.configured} model={groqHealth.model} />}
         {route.path === '/review/:id' && <ReviewResults review={data.reviews.find(item => item.id === route.reviewId)} memories={data.memories} onBack={() => navigate('/review')} onApply={applyFix} onSave={saveDecision} onDismiss={notify} />}
         {route.path === '/memory' && <MemoryPage memories={data.memories} activeTab={memoryTab} setActiveTab={setMemoryTab} openAdd={() => setModal({ kind: 'memory' })} />}
         {route.path === '/rules' && <RulesPage rules={data.rules} openAdd={() => setModal({ kind: 'rule' })} onToggle={id => setData(current => ({ ...current, rules: current.rules.map(rule => rule.id === id ? { ...rule, enabled: !rule.enabled } : rule) }))} onEdit={id => setModal({ kind: 'rule', id })} onDelete={id => { setData(current => ({ ...current, rules: current.rules.filter(rule => rule.id !== id) })); notify('Team rule removed.') }} />}
         {route.path === '/history' && <HistoryPage reviews={filteredReviews} query={historyQuery} setQuery={setHistoryQuery} filter={reviewFilter} setFilter={setReviewFilter} navigate={navigate} />}
-        {route.path === '/settings' && <SettingsPage settings={settings} setSettings={setSettings} notify={notify} geminiHealth={geminiHealth} />}
+        {route.path === '/settings' && <SettingsPage settings={settings} setSettings={setSettings} notify={notify} groqHealth={groqHealth} />}
         {!['/dashboard', '/review', '/review/:id', '/memory', '/rules', '/history', '/settings'].includes(route.path) && <NotFound navigate={navigate} />}
       </main>
       <footer className="app-footer"><BrandMark compact /><span>Team-aware code review, shaped by your decisions.</span><a href="https://github.com" onClick={event => event.preventDefault()}>Prototype environment</a></footer>
@@ -294,21 +304,21 @@ function Dashboard({ data, navigate }: { data: AppData; navigate: (path: string)
   const totalIssues = data.reviews.reduce((sum, review) => sum + review.issueCount, 0) + 96
   return <div className="page dashboard-page">
        <section className="dashboard-hero"><div className="hero-copy"><div className="hero-kicker"><span className="health-dot" />YOUR TEAM'S REVIEW AGENT</div><h1>Your team's AI<br /><span>code reviewer.</span></h1><p>An AI Code Review Agent that learns your team's coding standards.</p><div className="hero-actions"><button className="button-primary" onClick={() => navigate('/review')}><Plus size={16} />New code review<ArrowRight size={15} /></button><button className="button-quiet" onClick={() => navigate('/memory')}><BrainCircuit size={16} />Explore team memory</button></div><div className="hero-proof"><span><ShieldCheck size={14} />Team-aware by design</span><span><LockKeyhole size={13} />Private by default</span></div></div><div className="hero-visual"><div className="visual-orbit orbit-one" /><div className="visual-orbit orbit-two" /><div className="visual-core"><BrandMark compact /><div className="core-pulse" /></div><div className="floating-node node-rule"><span><ShieldCheck size={13} /></span>Team rules</div><div className="floating-node node-memory"><span><BrainCircuit size={13} /></span>Past decisions</div><div className="floating-node node-code"><span><Code2 size={13} /></span>New code</div><div className="hero-visual-caption"><span className="health-dot" />Agent memory active</div></div><div className="hero-grid-lines" /></section>
-    <section className="stats-grid"><StatCard label="Total reviews" value={data.reviews.length + 38} change="↑ 12 this week" icon={GitPullRequest} tone="stat-violet" /><StatCard label="Issues caught" value={totalIssues} change="Across 10 repositories" icon={ShieldAlert} tone="stat-rose" /><StatCard label="Memory items" value={data.memories.length + 136} change="↑ 8 learned this month" icon={BrainCircuit} tone="stat-blue" /><StatCard label="Team rules" value={data.rules.length} change={`${data.rules.filter(rule => rule.enabled).length} active standards`} icon={BookOpenCheck} tone="stat-teal" /></section>
+    <section className="stats-grid"><StatCard label="Total reviews" value={data.reviews.length + 38} change="â†‘ 12 this week" icon={GitPullRequest} tone="stat-violet" /><StatCard label="Issues caught" value={totalIssues} change="Across 10 repositories" icon={ShieldAlert} tone="stat-rose" /><StatCard label="Memory items" value={data.memories.length + 136} change="â†‘ 8 learned this month" icon={BrainCircuit} tone="stat-blue" /><StatCard label="Team rules" value={data.rules.length} change={`${data.rules.filter(rule => rule.enabled).length} active standards`} icon={BookOpenCheck} tone="stat-teal" /></section>
     <div className="dashboard-columns"><section className="surface recent-panel"><div className="section-heading"><div><div className="eyebrow">THE LATEST</div><h2>Recent reviews</h2></div><button className="text-action" onClick={() => navigate('/history')}>View history<ArrowRight size={14} /></button></div><ReviewTable reviews={data.reviews.slice(0, 4)} onOpen={id => navigate(`/review/${id}`)} /><div className="recent-footer"><span><Clock3 size={14} />Last synced just now</span><button onClick={() => navigate('/history')}>All reviews <ArrowRight size={14} /></button></div></section><section className="surface insights-panel"><div className="section-heading"><div><div className="eyebrow">YOUR TEAM'S KNOWLEDGE</div><h2>Memory insights</h2></div><button className="square-action" aria-label="Open memory" onClick={() => navigate('/memory')}><ArrowUpRight size={16} /></button></div><div className="insight-feature"><div className="insight-ring"><span><BrainCircuit size={19} /></span></div><div><strong>{data.memories.length + 136}</strong><span>memories available to your agent</span></div></div><div className="insight-list"><div><span className="insight-dot violet-dot" /><span>Team rules</span><strong>{data.rules.length}</strong></div><div><span className="insight-dot blue-dot" /><span>Architecture decisions</span><strong>{data.memories.filter(item => item.type === 'Architecture Decision').length + 4}</strong></div><div><span className="insight-dot amber-dot" /><span>Recurring issue patterns</span><strong>8</strong></div></div><button className="insight-link" onClick={() => navigate('/memory')}>Explore Agent Memory <ArrowRight size={14} /></button></section></div>
     <section className="agent-note"><span className="note-icon"><Sparkles size={16} /></span><p><strong>Reviews with context.</strong> CodeMind compares new code against 8 previous review decisions before it recommends a change.</p><button onClick={() => navigate('/memory')}>How memory works<ArrowRight size={13} /></button></section>
   </div>
 }
 
-function ReviewWorkspace({ code, setCode, language, setLanguage, data, reviewStage, onRun, onClear, onPaste, onCopy, navigate, memoryEnabled, geminiConfigured, model }: { code: string; setCode: (value: string) => void; language: string; setLanguage: (value: string) => void; data: AppData; reviewStage: number; onRun: () => void; onClear: () => void; onPaste: () => void; onCopy: () => void; navigate: (path: string) => void; memoryEnabled: boolean; geminiConfigured: boolean; model: string }) {
+function ReviewWorkspace({ code, setCode, language, setLanguage, data, reviewStage, onRun, onClear, onPaste, onCopy, navigate, memoryEnabled, groqConfigured, model }: { code: string; setCode: (value: string) => void; language: string; setLanguage: (value: string) => void; data: AppData; reviewStage: number; onRun: () => void; onClear: () => void; onPaste: () => void; onCopy: () => void; navigate: (path: string) => void; memoryEnabled: boolean; groqConfigured: boolean; model: string }) {
   if (reviewStage >= 0) return <div className="page review-loading-page"><LoadingAnalysis stage={reviewStage} steps={activitySteps} /></div>
   const rules = data.rules.filter(rule => rule.enabled).slice(0, 5)
   const decisions = memoryEnabled ? data.memories.filter(item => item.type === 'Previous Review').slice(0, 3) : []
   const architecture = memoryEnabled ? data.memories.filter(item => item.type === 'Architecture Decision').slice(0, 3) : []
   const liveAnalysis = analyzeCode({ code, language, rules: data.rules, memories: data.memories, memoryEnabled })
-  return <div className="page review-page"><PageHeading eyebrow="CODE REVIEW AGENT" title="Submit code for review" subtitle="Give your code a review grounded in how your team works." action={<div className={`agent-status ${geminiConfigured ? '' : 'agent-local'}`}><span className="health-dot" />{geminiConfigured ? `Gemini key loaded · ${model}` : 'Local checks only'}</div>} />
-    <div className="review-workspace"><div className="editor-column"><div className="editor-caption"><div><span className="editor-caption-icon"><Terminal size={15} /></span><span><strong>Review your changes</strong><small>Paste a snippet or edit the sample below</small></span></div><button className="button-quiet small-quiet" onClick={onClear}><RotateCw size={14} />Clear</button></div><CodeEditor code={code} setCode={setCode} language={language} setLanguage={setLanguage} onReview={onRun} onPaste={onPaste} onCopy={onCopy} /><LiveFindings issues={liveAnalysis.issues} hasCode={Boolean(code.trim())} /><div className="review-submit-row"><div className="editor-hint"><span>⌘</span><span>Enter</span><span>to review</span></div><button className="button-primary" onClick={onRun}><Sparkles size={16} />{geminiConfigured ? 'Review with Gemini' : 'Review code'}<ArrowRight size={15} /></button></div><div className="privacy-note"><LockKeyhole size={13} />{geminiConfigured ? `Submitting sends code and enabled team context to Google Gemini (${model}).` : 'Gemini is not configured; this review uses local checks only.'}</div></div>
-      <aside className="context-panel"><div className="context-heading"><div className="context-icon"><BrainCircuit size={17} /></div><div><h2>Review context</h2><span>What your agent already knows</span></div><span className={`context-live ${memoryEnabled ? '' : 'context-paused'}`}><i />{memoryEnabled ? 'LIVE' : 'PAUSED'}</span></div><div className="context-block"><div className="context-label"><span className="context-label-dot violet-dot" />TEAM RULES<span>{rules.length}</span></div>{rules.map(rule => <div className="context-item" key={rule.id}><Check size={12} />{rule.title}</div>)}<button className="context-more" onClick={() => navigate('/rules')}>View all team rules<ArrowRight size={12} /></button></div><div className="context-block"><div className="context-label"><span className="context-label-dot blue-dot" />PREVIOUS REVIEWS<span>{decisions.length}</span></div>{decisions.map(item => <div className="context-memory" key={item.id}><strong>{item.source}</strong><span>{item.title}</span></div>)}</div><div className="context-block context-last"><div className="context-label"><span className="context-label-dot teal-dot" />ARCHITECTURE DECISIONS<span>{architecture.length}</span></div>{architecture.map(item => <div className="context-memory" key={item.id}><strong>{item.title}</strong><span>{item.source} · used {item.usage} times</span></div>)}</div><div className="context-bottom"><span className="context-avatar"><BrainCircuit size={15} /></span><span>{memoryEnabled ? <>Context is retrieved from <strong>{data.memories.length} memory items</strong></> : 'Team memory is paused in settings'}</span></div></aside></div>
+  return <div className="page review-page"><PageHeading eyebrow="CODE REVIEW AGENT" title="Submit code for review" subtitle="Give your code a review grounded in how your team works." action={<div className={`agent-status ${groqConfigured ? '' : 'agent-local'}`}><span className="health-dot" />{groqConfigured ? `Groq key loaded Â· ${model}` : 'Local checks only'}</div>} />
+    <div className="review-workspace"><div className="editor-column"><div className="editor-caption"><div><span className="editor-caption-icon"><Terminal size={15} /></span><span><strong>Review your changes</strong><small>Paste a snippet or edit the sample below</small></span></div><button className="button-quiet small-quiet" onClick={onClear}><RotateCw size={14} />Clear</button></div><CodeEditor code={code} setCode={setCode} language={language} setLanguage={setLanguage} onReview={onRun} onPaste={onPaste} onCopy={onCopy} /><LiveFindings issues={liveAnalysis.issues} hasCode={Boolean(code.trim())} /><div className="review-submit-row"><div className="editor-hint"><span>âŒ˜</span><span>Enter</span><span>to review</span></div><button className="button-primary" onClick={onRun}><Sparkles size={16} />{groqConfigured ? 'Review with Groq' : 'Review code'}<ArrowRight size={15} /></button></div><div className="privacy-note"><LockKeyhole size={13} />{groqConfigured ? `Submitting sends code and enabled team context to Google Groq (${model}).` : 'Groq is not configured; this review uses local checks only.'}</div></div>
+      <aside className="context-panel"><div className="context-heading"><div className="context-icon"><BrainCircuit size={17} /></div><div><h2>Review context</h2><span>What your agent already knows</span></div><span className={`context-live ${memoryEnabled ? '' : 'context-paused'}`}><i />{memoryEnabled ? 'LIVE' : 'PAUSED'}</span></div><div className="context-block"><div className="context-label"><span className="context-label-dot violet-dot" />TEAM RULES<span>{rules.length}</span></div>{rules.map(rule => <div className="context-item" key={rule.id}><Check size={12} />{rule.title}</div>)}<button className="context-more" onClick={() => navigate('/rules')}>View all team rules<ArrowRight size={12} /></button></div><div className="context-block"><div className="context-label"><span className="context-label-dot blue-dot" />PREVIOUS REVIEWS<span>{decisions.length}</span></div>{decisions.map(item => <div className="context-memory" key={item.id}><strong>{item.source}</strong><span>{item.title}</span></div>)}</div><div className="context-block context-last"><div className="context-label"><span className="context-label-dot teal-dot" />ARCHITECTURE DECISIONS<span>{architecture.length}</span></div>{architecture.map(item => <div className="context-memory" key={item.id}><strong>{item.title}</strong><span>{item.source} Â· used {item.usage} times</span></div>)}</div><div className="context-bottom"><span className="context-avatar"><BrainCircuit size={15} /></span><span>{memoryEnabled ? <>Context is retrieved from <strong>{data.memories.length} memory items</strong></> : 'Team memory is paused in settings'}</span></div></aside></div>
   </div>
 }
 
@@ -318,12 +328,12 @@ function ReviewResults({ review, memories, onBack, onApply, onSave, onDismiss }:
   const matchIds = [...new Set(review.issues.flatMap(issue => [...(issue.memoryIds ?? []), ...(issue.memoryId === undefined ? [] : [issue.memoryId])]))]
   const matches = memories.filter(item => matchIds.includes(item.id))
   const passed = review.issues.length === 0
-  return <div className="page results-page"><div className="results-back"><button className="back-link" onClick={onBack}><ArrowDownRight size={14} />Back to code review</button><span>Review <i>/</i> PR #{review.id}</span></div><div className="results-title-row"><div><div className="eyebrow">CODE REVIEW AGENT <span className="eyebrow-slash">/</span> COMPLETED JUST NOW</div><h1>Code Review Complete</h1><p>{review.repository} <span>·</span> {review.language} <span>·</span> {review.issueCount} findings</p></div><StatusBadge status={passed ? 'Approved' : review.status} /></div><section className={`result-summary ${passed ? 'summary-passed' : ''}`}><div className="summary-icon">{passed ? <ShieldCheck size={18} /> : <TriangleAlert size={18} />}</div><div><strong>{passed ? 'REVIEW PASSED' : review.status}</strong><p>{review.summary}</p></div><div className="summary-metrics"><span><b>{review.critical}</b> critical</span><i /><span><b>{review.issueCount}</b> total</span></div></section><AgentTrace />
+  return <div className="page results-page"><div className="results-back"><button className="back-link" onClick={onBack}><ArrowDownRight size={14} />Back to code review</button><span>Review <i>/</i> PR #{review.id}</span></div><div className="results-title-row"><div><div className="eyebrow">CODE REVIEW AGENT <span className="eyebrow-slash">/</span> COMPLETED JUST NOW</div><h1>Code Review Complete</h1><p>{review.repository} <span>Â·</span> {review.language} <span>Â·</span> {review.issueCount} findings</p></div><StatusBadge status={passed ? 'Approved' : review.status} /></div><section className={`result-summary ${passed ? 'summary-passed' : ''}`}><div className="summary-icon">{passed ? <ShieldCheck size={18} /> : <TriangleAlert size={18} />}</div><div><strong>{passed ? 'REVIEW PASSED' : review.status}</strong><p>{review.summary}</p></div><div className="summary-metrics"><span><b>{review.critical}</b> critical</span><i /><span><b>{review.issueCount}</b> total</span></div></section><AgentTrace />
     {matches.length ? matches.map(item => <MemoryMatch item={item} key={item.id} />) : <div className="no-match-banner"><span><BrainCircuit size={17} /></span><div><strong>{passed ? 'No relevant memory required.' : 'No relevant previous team decision found.'}</strong><p>CodeMind only shows a Memory Match when a stored team rule or previous decision is relevant.</p></div></div>}
     <div className="findings-heading"><div><div className="eyebrow">REVIEW FINDINGS</div><h2>{passed ? 'No critical issues' : `${review.issues.length} recommendations`}</h2></div><div className="finding-legend"><span><i className="legend-critical" />Critical</span><span><i className="legend-warning" />Warning</span><span><i className="legend-suggestion" />Suggestion</span></div></div>
     {dismissedReviewId === review.id ? <div className="dismissed-findings"><span><Check size={14} /></span><div><strong>Findings dismissed for this review.</strong><small>You can restore them at any time.</small></div><button className="text-action" onClick={() => setDismissedReviewId(null)}>Restore findings</button></div> : <div className="issues-list">{review.issues.length ? review.issues.map((issue, index) => <ReviewIssue key={`${issue.title}-${index}`} issue={issue} index={index} />) : <div className="empty-findings"><ShieldCheck size={23} /><strong>No issues found</strong><span>This review has no recorded findings.</span></div>}</div>}
     <div className="result-actions"><button className="button-primary" onClick={() => onApply(review)}><Sparkles size={15} />Apply suggested fix</button><button className="button-secondary" onClick={() => { setDismissedReviewId(review.id); onDismiss('Findings dismissed for this review.') }}><X size={15} />Dismiss findings</button><button className={`button-secondary ${review.saved ? 'button-saved' : ''}`} onClick={() => onSave(review)}><BookOpenCheck size={15} />{review.saved ? 'Decision saved' : 'Save decision'}</button><span className="action-spacer" /><button className="button-quiet" onClick={onBack}>Back to review</button></div>
-    <div className="result-footnote"><BrainCircuit size={14} />{review.provider === 'Gemini' ? 'Reviewed by Gemini with the supplied team rules and memory context.' : 'Reviewed with local pattern checks. Configure Gemini for AI-powered analysis.'}</div>
+    <div className="result-footnote"><BrainCircuit size={14} />{review.provider === 'Groq' ? 'Reviewed by Groq with the supplied team rules and memory context.' : 'Reviewed with local pattern checks. Configure Groq for AI-powered analysis.'}</div>
   </div>
 }
 
@@ -347,13 +357,13 @@ function HistoryPage({ reviews, query, setQuery, filter, setFilter, navigate }: 
   return <div className="page history-page"><PageHeading eyebrow="A RECORD OF EVERY REVIEW" title="Review History" subtitle="Search completed reviews and revisit your team's decisions." action={<button className="button-primary" onClick={() => navigate('/review')}><Plus size={16} />New review</button>} /><section className="history-toolbar"><label className="history-search"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search by PR, repository, language..." /></label><select value={filter} onChange={event => setFilter(event.target.value)}><option>All reviews</option><option>Needs changes</option><option>Approved</option></select><span className="history-count">{reviews.length} reviews</span></section><section className="surface history-surface"><ReviewTable reviews={reviews} onOpen={id => navigate(`/review/${id}`)} /></section><div className="history-footer"><span><FileClock size={14} />Showing locally stored demo history</span><span>Most recent first</span></div></div>
 }
 
-function SettingsPage({ settings, setSettings, notify, geminiHealth }: { settings: SettingsData; setSettings: (settings: SettingsData) => void; notify: (message: string) => void; geminiHealth: GeminiHealth }) {
+function SettingsPage({ settings, setSettings, notify, groqHealth }: { settings: SettingsData; setSettings: (settings: SettingsData) => void; notify: (message: string) => void; groqHealth: GroqHealth }) {
   const update = <K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) => setSettings({ ...settings, [key]: value })
-  return <div className="page settings-page"><PageHeading eyebrow="WORKSPACE PREFERENCES" title="Settings" subtitle="Configure how CodeMind works with your team." action={<button className="button-primary" onClick={() => notify('Workspace settings saved locally.')}><Check size={15} />Save changes</button>} /><GeminiConnection configured={geminiHealth.configured} model={geminiHealth.model} /><div className="settings-layout"><div className="settings-nav"><span className="eyebrow">PREFERENCES</span><a className="settings-nav-active" href="#workspace">Workspace</a><a href="#review">Review behavior</a><a href="#memory">Agent memory</a><a href="#notifications">Notifications</a></div><div className="settings-content"><section className="settings-section" id="workspace"><div className="settings-section-heading"><span className="settings-icon"><Layers3 size={16} /></span><div><h2>Workspace</h2><p>Where your team's review context comes from.</p></div></div><label className="field-label">Team name<input className="text-input" value={settings.team} onChange={event => update('team', event.target.value)} /></label><label className="field-label">Repository<input className="text-input" value={settings.repository} onChange={event => update('repository', event.target.value)} /></label><label className="field-label">Default programming language<select className="text-input" value={settings.defaultLanguage} onChange={event => update('defaultLanguage', event.target.value)}>{['Python', 'TypeScript', 'JavaScript', 'Go', 'Java'].map(value => <option key={value}>{value}</option>)}</select></label></section><section className="settings-section" id="review"><div className="settings-section-heading"><span className="settings-icon"><SlidersHorizontal size={16} /></span><div><h2>Review preferences</h2><p>Choose what the agent prioritizes for your team.</p></div></div><SettingToggle title="Block on critical issues" description="Flag a review as needing changes when critical issues are found." enabled={settings.blockCritical} onChange={value => update('blockCritical', value)} /><SettingToggle title="Inline fix suggestions" description="Include a suggested change with each finding." enabled={settings.inlineSuggestions} onChange={value => update('inlineSuggestions', value)} /><SettingToggle title="Strict mode" description="Surface lower-confidence convention and style violations." enabled={settings.strictMode} onChange={value => update('strictMode', value)} /></section><section className="settings-section" id="memory"><div className="settings-section-heading"><span className="settings-icon"><BrainCircuit size={16} /></span><div><h2>Agent memory</h2><p>Control how team knowledge is used and retained.</p></div></div><SettingToggle title="Automatically save decisions" description="Suggest saving useful review outcomes to Agent Memory." enabled={settings.autoSave} onChange={value => update('autoSave', value)} /><SettingToggle title="Use team memory during reviews" description="Retrieve rules and previous decisions as review context." enabled={settings.useMemory} onChange={value => update('useMemory', value)} /><SettingToggle title="Notify me about Memory Matches" description="Show when a finding matches a previous team decision." enabled={settings.memoryNotifications} onChange={value => update('memoryNotifications', value)} /></section><section className="settings-section" id="notifications"><div className="settings-section-heading"><span className="settings-icon"><Zap size={16} /></span><div><h2>Notifications</h2><p>Stay informed about agent activity.</p></div></div><SettingToggle title="Review completion" description="Notify when a code review finishes analyzing." enabled={settings.reviewNotifications} onChange={value => update('reviewNotifications', value)} /></section></div></div></div>
+  return <div className="page settings-page"><PageHeading eyebrow="WORKSPACE PREFERENCES" title="Settings" subtitle="Configure how CodeMind works with your team." action={<button className="button-primary" onClick={() => notify('Workspace settings saved locally.')}><Check size={15} />Save changes</button>} /><GroqConnection configured={groqHealth.configured} model={groqHealth.model} /><div className="settings-layout"><div className="settings-nav"><span className="eyebrow">PREFERENCES</span><a className="settings-nav-active" href="#workspace">Workspace</a><a href="#review">Review behavior</a><a href="#memory">Agent memory</a><a href="#notifications">Notifications</a></div><div className="settings-content"><section className="settings-section" id="workspace"><div className="settings-section-heading"><span className="settings-icon"><Layers3 size={16} /></span><div><h2>Workspace</h2><p>Where your team's review context comes from.</p></div></div><label className="field-label">Team name<input className="text-input" value={settings.team} onChange={event => update('team', event.target.value)} /></label><label className="field-label">Repository<input className="text-input" value={settings.repository} onChange={event => update('repository', event.target.value)} /></label><label className="field-label">Default programming language<select className="text-input" value={settings.defaultLanguage} onChange={event => update('defaultLanguage', event.target.value)}>{['Python', 'TypeScript', 'JavaScript', 'Go', 'Java'].map(value => <option key={value}>{value}</option>)}</select></label></section><section className="settings-section" id="review"><div className="settings-section-heading"><span className="settings-icon"><SlidersHorizontal size={16} /></span><div><h2>Review preferences</h2><p>Choose what the agent prioritizes for your team.</p></div></div><SettingToggle title="Block on critical issues" description="Flag a review as needing changes when critical issues are found." enabled={settings.blockCritical} onChange={value => update('blockCritical', value)} /><SettingToggle title="Inline fix suggestions" description="Include a suggested change with each finding." enabled={settings.inlineSuggestions} onChange={value => update('inlineSuggestions', value)} /><SettingToggle title="Strict mode" description="Surface lower-confidence convention and style violations." enabled={settings.strictMode} onChange={value => update('strictMode', value)} /></section><section className="settings-section" id="memory"><div className="settings-section-heading"><span className="settings-icon"><BrainCircuit size={16} /></span><div><h2>Agent memory</h2><p>Control how team knowledge is used and retained.</p></div></div><SettingToggle title="Automatically save decisions" description="Suggest saving useful review outcomes to Agent Memory." enabled={settings.autoSave} onChange={value => update('autoSave', value)} /><SettingToggle title="Use team memory during reviews" description="Retrieve rules and previous decisions as review context." enabled={settings.useMemory} onChange={value => update('useMemory', value)} /><SettingToggle title="Notify me about Memory Matches" description="Show when a finding matches a previous team decision." enabled={settings.memoryNotifications} onChange={value => update('memoryNotifications', value)} /></section><section className="settings-section" id="notifications"><div className="settings-section-heading"><span className="settings-icon"><Zap size={16} /></span><div><h2>Notifications</h2><p>Stay informed about agent activity.</p></div></div><SettingToggle title="Review completion" description="Notify when a code review finishes analyzing." enabled={settings.reviewNotifications} onChange={value => update('reviewNotifications', value)} /></section></div></div></div>
 }
 
-function GeminiConnection({ configured, model }: { configured: boolean; model: string }) {
-  return <section className={`gemini-connection ${configured ? 'gemini-connected' : ''}`}><span className="gemini-connection-icon"><Sparkles size={17} /></span><div className="gemini-connection-copy"><div className="eyebrow">AI REVIEW PROVIDER</div><strong>{configured ? 'Gemini API key loaded' : 'Gemini is not configured'}</strong><p>{configured ? `Key is set for ${model}; credentials and quota are verified when a review runs.` : 'Add a Gemini API key to the server environment to enable AI-powered reviews.'}</p></div><div className="gemini-connection-action">{configured ? <span><i />KEY SET</span> : <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Get a Gemini key<ArrowRight size={13} /></a>}<small>{configured ? model : 'Set GEMINI_API_KEY in server environment'}</small></div></section>
+function GroqConnection({ configured, model }: { configured: boolean; model: string }) {
+  return <section className={`groq-connection ${configured ? 'groq-connected' : ''}`}><span className="groq-connection-icon"><Sparkles size={17} /></span><div className="groq-connection-copy"><div className="eyebrow">AI REVIEW PROVIDER</div><strong>{configured ? 'Groq API key loaded' : 'Groq is not configured'}</strong><p>{configured ? `Key is set for ${model}; credentials and quota are verified when a review runs.` : 'Add a Groq API key to the server environment to enable AI-powered reviews.'}</p></div><div className="groq-connection-action">{configured ? <span><i />KEY SET</span> : <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Get a Groq key<ArrowRight size={13} /></a>}<small>{configured ? model : 'Set GROQ_API_KEY in server environment'}</small></div></section>
 }
 
 function SettingToggle({ title, description, enabled, onChange }: { title: string; description: string; enabled: boolean; onChange: (enabled: boolean) => void }) {
@@ -384,7 +394,9 @@ function AppModal({ modal, data, setData, onClose, notify }: { modal: Exclude<Mo
 }
 
 function NotFound({ navigate }: { navigate: (path: string) => void }) {
-  return <div className="page not-found"><div className="not-found-mark"><Braces size={24} /></div><div className="eyebrow">404 · ROUTE NOT FOUND</div><h1>This branch doesn't exist.</h1><p>Head back to your dashboard to pick up where your team left off.</p><button className="button-primary" onClick={() => navigate('/dashboard')}>Back to dashboard<ArrowRight size={15} /></button></div>
+  return <div className="page not-found"><div className="not-found-mark"><Braces size={24} /></div><div className="eyebrow">404 Â· ROUTE NOT FOUND</div><h1>This branch doesn't exist.</h1><p>Head back to your dashboard to pick up where your team left off.</p><button className="button-primary" onClick={() => navigate('/dashboard')}>Back to dashboard<ArrowRight size={15} /></button></div>
 }
 
 export default App
+
+

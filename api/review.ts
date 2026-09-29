@@ -1,5 +1,5 @@
-import { GeminiReviewError, reviewWithGemini } from '../server/gemini.js'
-import type { ReviewInput } from '../server/gemini.js'
+import { GroqReviewError, reviewCode } from '../server/groq.js'
+import type { ReviewInput } from '../server/groq.js'
 
 export const maxDuration = 60
 
@@ -12,12 +12,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    return Response.json(await reviewWithGemini(body as ReviewInput))
+    return Response.json(await reviewCode(body as ReviewInput))
   } catch (error) {
-    if (error instanceof GeminiReviewError) {
+    if (error instanceof GroqReviewError) {
       return Response.json({ code: error.code, error: error.message }, { status: error.status })
     }
-    console.error('Unexpected Gemini review error.')
+    console.error('Unexpected Groq review error.')
     return Response.json({ code: 'review_failed', error: 'The review could not be completed.' }, { status: 500 })
   }
 }

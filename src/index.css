@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+﻿@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -1326,7 +1326,7 @@ select:focus-visible {
   background: #d4a85e;
   box-shadow: 0 0 8px #d4a85e55;
 }
-.gemini-connection {
+.groq-connection {
   min-height: 81px;
   margin: -8px 0 20px;
   padding: 13px 15px;
@@ -1337,11 +1337,11 @@ select:focus-visible {
   align-items: center;
   gap: 11px;
 }
-.gemini-connected {
+.groq-connected {
   border-color: #31564a;
   background: linear-gradient(105deg, #19251f, #14181a 72%);
 }
-.gemini-connection-icon {
+.groq-connection-icon {
   width: 32px;
   height: 32px;
   flex: none;
@@ -1352,45 +1352,45 @@ select:focus-visible {
   display: grid;
   place-items: center;
 }
-.gemini-connected .gemini-connection-icon {
+.groq-connected .groq-connection-icon {
   border-color: #3b6757;
   background: #20352c;
   color: #83d4b1;
 }
-.gemini-connection-copy {
+.groq-connection-copy {
   flex: 1;
 }
-.gemini-connection-copy .eyebrow {
+.groq-connection-copy .eyebrow {
   color: #c9a76d;
   font-size: 8px;
 }
-.gemini-connected .gemini-connection-copy .eyebrow {
+.groq-connected .groq-connection-copy .eyebrow {
   color: #7fc9a9;
 }
-.gemini-connection-copy strong {
+.groq-connection-copy strong {
   display: block;
   margin-top: 2px;
   color: #e4e1d9;
   font-size: 10px;
 }
-.gemini-connected .gemini-connection-copy strong {
+.groq-connected .groq-connection-copy strong {
   color: #d8e7df;
 }
-.gemini-connection-copy p {
+.groq-connection-copy p {
   margin: 2px 0 0;
   color: #96958d;
   font-size: 8px;
 }
-.gemini-connected .gemini-connection-copy p {
+.groq-connected .groq-connection-copy p {
   color: #92a49a;
 }
-.gemini-connection-action {
+.groq-connection-action {
   display: grid;
   justify-items: end;
   gap: 4px;
 }
-.gemini-connection-action > a,
-.gemini-connection-action > span {
+.groq-connection-action > a,
+.groq-connection-action > span {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -1399,20 +1399,20 @@ select:focus-visible {
   text-decoration: none;
   white-space: nowrap;
 }
-.gemini-connection-action > a:hover {
+.groq-connection-action > a:hover {
   color: #f1d59f;
 }
-.gemini-connection-action > span {
+.groq-connection-action > span {
   color: #80d0ae;
   font: 8px var(--mono);
 }
-.gemini-connection-action > span > i {
+.groq-connection-action > span > i {
   height: 5px;
   width: 5px;
   border-radius: 50%;
   background: #7ed0ad;
 }
-.gemini-connection-action small {
+.groq-connection-action small {
   color: #817e74;
   font: 8px var(--mono);
   white-space: nowrap;
@@ -4230,3 +4230,4 @@ select:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+

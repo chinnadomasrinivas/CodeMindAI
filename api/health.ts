@@ -1,7 +1,7 @@
-import { getGeminiHealth } from '../server/gemini.js'
+import { getGroqHealth } from '../server/groq.js'
 
 export function GET() {
-  return Response.json(getGeminiHealth(), {
+  return Response.json(getGroqHealth(), {
     headers: { 'Cache-Control': 'no-store' },
   })
 }
