@@ -67,7 +67,10 @@ function createMutableDefaultFix(lines: string[], definitionLine: number) {
   if (!argument) return undefined
   const [, name, defaultValue] = argument
   const updated = [...lines]
-  updated[definitionLine] = updated[definitionLine].replace(`${name}=${defaultValue}`, `${name}=None`)
+  updated[definitionLine] = updated[definitionLine].replace(
+    new RegExp(`(\\b${name}\\s*=\\s*)(?:\\[\\]|\\{\\})`),
+    '$1None',
+  )
   const indent = `${lines[definitionLine].match(/^\s*/)?.[0] ?? ''}    `
   updated.splice(definitionLine + 1, 0, `${indent}if ${name} is None:`, `${indent}    ${name} = ${defaultValue}`)
   return updated.join('\n')

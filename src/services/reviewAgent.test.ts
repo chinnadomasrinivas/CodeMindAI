@@ -82,6 +82,12 @@ describe('CodeMind sample review cases', () => {
     expect(result.fixedCode).toContain('if items is None:')
   })
 
+  it('generates a mutable-default fix when the argument has spaces', () => {
+    const result = review('def add_item(item, items = []):\n    items.append(item)\n    return items')
+    expect(result.fixedCode).toContain('items = None')
+    expect(result.fixedCode).toContain('if items is None:')
+  })
+
   it('12 returns separate SQL and password memory matches', () => {
     const code = 'def login(username, password):\n    query = "SELECT * FROM users WHERE username=\'" + username + "\' AND password=\'" + password + "\'"\n    return database.execute(query)'
     const result = review(code)

@@ -206,7 +206,7 @@ function App() {
         date: 'Today', critical,
         summary: analysis.summary,
         issues,
-        fixedCode: analysis.fixedCode || undefined,
+        fixedCode: analysis.fixedCode || localAnalysis.fixedCode || undefined,
         provider: analysis.provider,
         lesson: analysis.lesson ?? {
           type: matchedMemory?.type ?? 'Common Mistake',
