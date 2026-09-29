@@ -2667,14 +2667,39 @@ select:focus-visible {
 }
 .compare-code-block {
   margin: 0;
-  padding: 12px 14px;
+  padding: 8px 10px;
   max-height: 300px;
   overflow: auto;
   color: #dfe7f3;
-  font: 11px/1.7 var(--mono);
+  background: transparent;
+}
+.code-line-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  min-height: 22px;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: 6px;
+  color: #dfe7f3;
+  font: 11px/1.6 var(--mono);
+}
+.code-line-number {
+  color: #677284;
+  user-select: none;
+  text-align: right;
+}
+.code-line-text {
   white-space: pre-wrap;
   word-break: break-word;
-  background: transparent;
+}
+.code-line-added {
+  background: rgba(76, 186, 130, 0.13);
+  border: 1px solid rgba(115, 211, 160, 0.3);
+  color: #b7efce;
+}
+.code-line-added .code-line-number {
+  color: #9fe7bd;
 }
 .compare-code-block::-webkit-scrollbar {
   width: 9px;

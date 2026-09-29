@@ -66,6 +66,23 @@ function formatToday() {
   return new Intl.DateTimeFormat('en', { month: 'short', day: '2-digit', year: 'numeric' }).format(new Date())
 }
 
+function renderCodeDiff(original: string, fixed: string) {
+  const originalLines = original.split('\n')
+  const fixedLines = fixed.split('\n')
+  const maxLength = Math.max(originalLines.length, fixedLines.length)
+  const changed = new Set<number>()
+
+  for (let index = 0; index < maxLength; index += 1) {
+    if (originalLines[index] !== fixedLines[index]) changed.add(index)
+  }
+
+  return fixedLines.map((line, index) => ({
+    line,
+    changed: changed.has(index),
+    key: `${index}-${line}`,
+  }))
+}
+
 function App() {
   const [data, setData] = useState<AppData>(loadData)
   const [route, setRoute] = useState<RouteState>(currentRoute)
@@ -325,11 +342,20 @@ function ReviewWorkspace({ code, setCode, language, setLanguage, data, reviewSta
     {fixPreview && <div className="fix-preview-panel">
       <div className="compare-pane original-pane">
         <div className="compare-pane-header"><span>Current code</span><button className="button-quiet small-quiet" onClick={onClosePreview}>Close</button></div>
-        <pre className="compare-code-block">{fixPreview.original}</pre>
+        <div className="compare-code-block">
+          {fixPreview.original.split('\n').map((line, index) => <div key={`original-${index}`} className="code-line-row"><span className="code-line-number">{index + 1}</span><span className="code-line-text">{line || ' '}</span></div>)}
+        </div>
       </div>
       <div className="compare-pane fixed-pane">
         <div className="compare-pane-header"><span>Suggested fix</span><button className="button-primary" onClick={() => setCode(fixPreview.fixed)}>Use fix</button></div>
-        <pre className="compare-code-block">{fixPreview.fixed}</pre>
+        <div className="compare-code-block">
+          {renderCodeDiff(fixPreview.original, fixPreview.fixed).map(({ line, changed }, index) => (
+            <div key={`fixed-${index}`} className={`code-line-row ${changed ? 'code-line-added' : ''}`}>
+              <span className="code-line-number">{index + 1}</span>
+              <span className="code-line-text">{line || ' '}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>}
     <div className="review-submit-row"><div className="editor-hint"><span>⌘</span><span>Enter</span><span>to review</span></div><button className="button-primary" onClick={onRun}><Sparkles size={16} />{groqConfigured ? 'Review with Groq' : 'Review code'}<ArrowRight size={15} /></button></div><div className="privacy-note"><LockKeyhole size={13} />{groqConfigured ? `Submitting sends code and enabled team context to Google Groq (${model}).` : 'Groq is not configured; this review uses local checks only.'}</div></div>
@@ -344,7 +370,6 @@ function ReviewResults({ review, memories, onBack, onApply, onSave, onDismiss }:
   const matches = memories.filter(item => matchIds.includes(item.id))
   const passed = review.issues.length === 0
   return <div className="page results-page"><div className="results-back"><button className="back-link" onClick={onBack}><ArrowDownRight size={14} />Back to code review</button><span>Review <i>/</i> PR #{review.id}</span></div><div className="results-title-row"><div><div className="eyebrow">CODE REVIEW AGENT <span className="eyebrow-slash">/</span> COMPLETED JUST NOW</div><h1>Code Review Complete</h1><p>{review.repository} <span>·</span> {review.language} <span>·</span> {review.issueCount} findings</p></div><StatusBadge status={passed ? 'Approved' : review.status} /></div><section className={`result-summary ${passed ? 'summary-passed' : ''}`}><div className="summary-icon">{passed ? <ShieldCheck size={18} /> : <TriangleAlert size={18} />}</div><div><strong>{passed ? 'REVIEW PASSED' : review.status}</strong><p>{review.summary}</p></div><div className="summary-metrics"><span><b>{review.critical}</b> critical</span><i /><span><b>{review.issueCount}</b> total</span></div></section><AgentTrace />
-    {review.originalCode && review.fixedCode && <div className="fix-preview-panel result-panel"><div className="compare-pane original-pane"><div className="compare-pane-header"><span>Original code</span><span className="compare-pane-badge">Before</span></div><pre className="compare-code-block">{review.originalCode}</pre></div><div className="compare-pane fixed-pane"><div className="compare-pane-header"><span>Suggested fix</span><span className="compare-pane-badge">After</span></div><pre className="compare-code-block">{review.fixedCode}</pre></div></div>}
     {matches.length ? matches.map(item => <MemoryMatch item={item} key={item.id} />) : <div className="no-match-banner"><span><BrainCircuit size={17} /></span><div><strong>{passed ? 'No relevant memory required.' : 'No relevant previous team decision found.'}</strong><p>CodeMind only shows a Memory Match when a stored team rule or previous decision is relevant.</p></div></div>}
     <div className="findings-heading"><div><div className="eyebrow">REVIEW FINDINGS</div><h2>{passed ? 'No critical issues' : `${review.issues.length} recommendations`}</h2></div><div className="finding-legend"><span><i className="legend-critical" />Critical</span><span><i className="legend-warning" />Warning</span><span><i className="legend-suggestion" />Suggestion</span></div></div>
     {dismissedReviewId === review.id ? <div className="dismissed-findings"><span><Check size={14} /></span><div><strong>Findings dismissed for this review.</strong><small>You can restore them at any time.</small></div><button className="text-action" onClick={() => setDismissedReviewId(null)}>Restore findings</button></div> : <div className="issues-list">{review.issues.length ? review.issues.map((issue, index) => <ReviewIssue key={`${issue.title}-${index}`} issue={issue} index={index} />) : <div className="empty-findings"><ShieldCheck size={23} /><strong>No issues found</strong><span>This review has no recorded findings.</span></div>}</div>}
