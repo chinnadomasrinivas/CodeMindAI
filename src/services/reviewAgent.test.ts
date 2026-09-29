@@ -55,6 +55,7 @@ describe('CodeMind sample review cases', () => {
     expect(issue?.severity).toBe('WARNING')
     expect(issue?.memoryId).toBeUndefined()
     expect(result.summary).toContain('No relevant previous team decision found')
+    expect(result.fixedCode).toBeUndefined()
   })
 
   it('08 passes the clean calculation with no findings', () => {

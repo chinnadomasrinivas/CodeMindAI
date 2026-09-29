@@ -232,7 +232,9 @@ function App() {
         summary: analysis.summary,
         issues,
         originalCode: code,
-        fixedCode: analysis.fixedCode || localAnalysis.fixedCode || undefined,
+        fixedCode: [analysis.fixedCode, localAnalysis.fixedCode].find((candidate): candidate is string =>
+          typeof candidate === 'string' && Boolean(candidate.trim()) && candidate.trim() !== code.trim(),
+        ),
         provider: analysis.provider,
         lesson: analysis.lesson ?? {
           type: matchedMemory?.type ?? 'Common Mistake',
@@ -285,10 +287,12 @@ function App() {
   }
 
   function applyFix(review: ReviewRecord) {
-    const fixed = review.fixedCode?.trim() ? review.fixedCode : generateFixedCode(code, review.language, review.issues)
-    if (!fixed) { notify('There is no automatic fix available for this review.'); return }
-    setFixPreview({ original: code, fixed, language: review.language })
-    setCode(code)
+    const original = review.originalCode ?? code
+    const fixed = [review.fixedCode, generateFixedCode(original, review.language, review.issues)].find((candidate): candidate is string =>
+      typeof candidate === 'string' && Boolean(candidate.trim()) && candidate.trim() !== original.trim(),
+    )
+    if (!fixed) { notify('No corrected code is available for these findings. Review the suggestions or configure Groq for AI-generated fixes.'); return }
+    setFixPreview({ original, fixed, language: review.language })
     setLanguage(review.language)
     navigate('/review')
     notify('Suggested fix preview loaded alongside the original code.')
@@ -314,7 +318,7 @@ function App() {
         {route.path === '/settings' && <SettingsPage settings={settings} setSettings={setSettings} notify={notify} groqHealth={groqHealth} />}
         {!['/dashboard', '/review', '/review/:id', '/memory', '/rules', '/history', '/settings'].includes(route.path) && <NotFound navigate={navigate} />}
       </main>
-      <footer className="app-footer"><BrandMark compact /><span>Team-aware code review, shaped by your decisions.</span><a href="https://github.com" onClick={event => event.preventDefault()}>Prototype environment</a></footer>
+      <footer className="app-footer"><BrandMark compact /><span>Team-aware code review, shaped by your decisions.</span><a href="/article.html">About CodeMind AI</a></footer>
     </div>
     {modal && <AppModal modal={modal} data={data} setData={setData} onClose={() => setModal(null)} notify={notify} />}
     {toast && <Toast message={toast} onClose={() => setToast('')} />}

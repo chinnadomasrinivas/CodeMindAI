@@ -116,7 +116,8 @@ export function generateFixedCode(code: string, language: string, issues: Review
     if (filtered.length) lines = filtered
   }
 
-  return lines.join('\n')
+  const fixedCode = lines.join('\n')
+  return fixedCode === code ? undefined : fixedCode
 }
 
 export function analyzeCode({ code, language, rules, memories, memoryEnabled }: AnalyzeInput): ReviewAnalysis {
