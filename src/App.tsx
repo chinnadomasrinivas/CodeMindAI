@@ -182,12 +182,17 @@ function App() {
     } catch {
       geminiConfigured = false
     }
+    let usedLocalFallback = false
     const analysisRequest = geminiConfigured
       ? fetch('/api/review', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, language, rules: data.rules, memories: data.memories, memoryEnabled: settings.useMemory, blockCritical: settings.blockCritical }),
       }).then(async response => {
         const payload = await response.json()
+        if (response.status === 429) {
+          usedLocalFallback = true
+          return localResult
+        }
         if (!response.ok) throw new Error(payload.error ?? 'Gemini review failed. Check the server configuration.')
         return payload as GeminiReviewResponse
       })
@@ -220,6 +225,7 @@ function App() {
         memories: current.memories.map(memory => matchedIds.includes(memory.id) ? { ...memory, usage: memory.usage + 1 } : memory),
       }))
       setReviewStage(-1)
+      if (usedLocalFallback) notify('Gemini quota reached. Review completed with local checks instead.')
       navigate(`/review/${nextId}`)
     } catch (error) {
       if (stageTimer.current) clearInterval(stageTimer.current)
